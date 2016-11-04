@@ -1,18 +1,19 @@
-#coding:utf-8
+# coding:utf-8
 #!/usr/bin/env python
 import json
-import os.path
-import pprint
+from utils import async
+
 
 class JRTTAd(object):
+
     def __init__(self):
         pass
 
     @classmethod
+    @async
     def open(cls, data):
         data = json.loads(data)
         result = []
-        nrows = 1
         for index, i in enumerate(data.get('data', [])):
             content = i['content']
             print content
@@ -22,6 +23,6 @@ class JRTTAd(object):
             title = content['title']
             imgs = [t['url'] for t in content['image_list']]
             url = content['url']
-            result.append({'title':title, "ad_type":u"今日头条", 'description':"", 'url':url, 'imgs':",".join(imgs)})
+            result.append({'title': title, "ad_type": u"今日头条", 'description': "", 'url': url, 'imgs': ",".join(imgs)})
         print result
         return result

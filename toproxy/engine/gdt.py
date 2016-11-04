@@ -1,19 +1,20 @@
-#coding:utf-8
+# coding:utf-8
 #!/usr/bin/env python
 import json
-import os.path
-import pprint
+from utils import async
+
 
 class GDTAd(object):
+
     def __init__(self):
         pass
 
     @classmethod
+    @async
     def open(cls, data):
         data = json.loads(data)
         result = []
-        nrows = 1
         for index, i in enumerate(data.get('data', {}).values()):
             for t in i["list"]:
-                result.append({'title':t['txt'], "ad_type":u"广点通", 'description':t['desc'], 'url':t.get('rl', ''), 'imgs':",".join([t['img'], t['img2']])})
+                result.append({'title': t['txt'], "ad_type": u"广点通", 'description': t['desc'], 'url': t.get('rl', ''), 'imgs': ",".join([t['img'], t['img2']])})
         return result
