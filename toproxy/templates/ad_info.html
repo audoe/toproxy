@@ -1,0 +1,64 @@
+<html>
+<head>
+<link href="/static/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+	<div>
+		<h1>广告查看器</h1>
+<form style="
+    float: right;
+" class="form-inline" role="form" action="/ad_info">
+  <div class="form-group">
+    <div class="input-group">
+      <div class="input-group-addon">来源</div>
+<select class="form-control" name="ad_type">
+          <option value="">全部</option>
+          <option value="广点通">广点通</option>
+          <option value="今日头条">今日头条</option>
+          <option value="网易新闻">网易新闻</option>
+          <option value="腾讯新闻">腾讯新闻</option>
+          <option value="搜狐新闻">搜狐新闻</option>
+        </select>
+    </div>
+  </div>
+  <div class="form-group">
+    <div class="input-group">
+      <div class="input-group-addon">关键字</div>
+      <input class="form-control" type="text" name="key" placeholder="">
+    </div>
+  </div>
+  <button type="submit" class="btn btn-default">搜索</button>
+</form>
+
+
+
+		<table class="table table-bordered">
+			<thead>
+			<tr>
+				<td>抓取时间</td>
+				<td>标题</td>
+				<td>描述</td>
+				<td>来源</td>
+				<td>URL</td>
+				<td>图片</td>
+			</tr>
+                       </thead>
+			{% for ad in ad_info %}
+			<tr>
+				<td>{{ad['create_time']}}</td>
+				<td>{{ad['title']}}</td>
+				<td>{{ad['description']}}</td>
+				<td>{{ad['ad_type']}}</td>
+				<td><a href="{{ad['url']}}">广告链接</a></td>
+				<td>{%for img in ad['imgs'].split(',')%}
+                    <img style="
+    max-height: 112px;
+" src="{{img}}" alt="">
+                    {%end%}
+				</td>
+			</tr>
+	            {% end %}
+		</table>
+	</div>
+</body>
+</html>

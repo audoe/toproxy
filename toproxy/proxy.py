@@ -1,38 +1,110 @@
-#coding:utf-8
+# coding:utf-8
 #!/usr/bin/env python
 
 import logging
 import os
 import re
-import sys
 import socket
 from urlparse import urlparse
-
+import threading
+import functools
 import tornado.httpserver
 import tornado.ioloop
 import tornado.iostream
 import tornado.web
 import tornado.httpclient
+import os.path
+
+from engine.gdt import GDTAd
+from engine.wy163 import WYAd
+from engine.jrtt import JRTTAd
+from engine.sohu import SohuAd
+from engine.qq import QQAd
+from models import AdInfo
+from datetime import datetime
 
 logger = logging.getLogger()
+
+ad_route = [
+    ("http://news.l.qq.com/app", QQAd.open),
+    ("http://mi.gdt.qq.com/gdt_mview.fcg", GDTAd.open),
+    ("http://g1.163.com/madrs", WYAd.open),
+    ("http://lf.snssdk.com/api/news/feed/v47", JRTTAd.open),
+    ("http://s.go.sohu.com/adgtr/", SohuAd.open)
+]
+
+
+def async(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        my_thread = threading.Thread(target=func, args=args, kwargs=kwargs)
+        my_thread.setDaemon(True)
+        my_thread.start()
+    return wrapper
+
+
+class AdInfoHandler(tornado.web.RequestHandler):
+    SUPPORTED_METHODS = ['GET', 'POST', 'CONNECT']
+
+    @tornado.web.asynchronous
+    def get(self):
+        ad_type = self.request.arguments.get('ad_type', [''])[0]
+        key = self.request.arguments.get('key', [''])[0]
+        query_str = ""
+        if ad_type:
+            query_str = "`ad_type` = '%s'" % ad_type
+
+        if ad_type and key:
+            query_str += " AND (`title` like '%%%s%%' or `description` like '%%%s%%')" % (key, key)
+        elif key:
+            query_str += " `title` like '%%%s%%' or `description` like '%%%s%%'" % (key, key)
+        if query_str:
+            query_str += "order by create_time desc"
+        else:
+            query_str += "1=1 order by create_time desc"
+
+        ad_info = AdInfo().query(query_str)
+
+        self.render("ad_info.html", ad_info=ad_info)
 
 
 class ProxyHandler(tornado.web.RequestHandler):
     SUPPORTED_METHODS = ['GET', 'POST', 'CONNECT']
 
+    @classmethod
+    def handle_ads(cls, engine, data):
+        ads = []
+        ads = engine(data)
+        for ad in ads:
+            ad_info = AdInfo()
+            if ad_info.query(u"`title`= '%s' AND `ad_type` = '%s'" % (ad['title'], ad['ad_type'])):
+                continue
+            ad_info.title = ad['title']
+            ad_info.description = ad['description']
+            ad_info.create_time = datetime.now()
+            ad_info.url = ad['url']
+            ad_info.ad_type = ad['ad_type']
+            ad_info.imgs = ad['imgs']
+            ad_info.save()
+
     @tornado.web.asynchronous
     def get(self):
-        logger.debug('Handle %s request to %s', self.request.method,self.request.uri)
+        logger.debug('Handle %s request to %s', self.request.method, self.request.uri)
 
         def handle_response(response):
-            #self.request.headers.get("X-Real-Ip",'')
+            # self.request.headers.get("X-Real-Ip",'')
             if (response.error and not
                     isinstance(response.error, tornado.httpclient.HTTPError)):
                 self.set_status(500)
                 self.write('Internal server error:\n' + str(response.error))
             else:
+                # 广告抓取
+                for url, engine in ad_route:
+                    if re.match(url, response.effective_url):
+                        async(ProxyHandler.handle_ads, engine, response.body)
+
                 self.set_status(response.code)
-                for header in ('Date', 'Cache-Control', 'Server','Content-Type', 'Location'):
+                for header in ('Date', 'Cache-Control', 'Server', 'Content-Type', 'Location'):
                     v = response.headers.get(header)
                     if v:
                         self.set_header(header, v)
@@ -66,7 +138,7 @@ class ProxyHandler(tornado.web.RequestHandler):
             self.set_status(403)
             self.write('')
             self.finish()
-            return 
+            return
         body = self.request.body
         if not body:
             body = None
@@ -149,14 +221,14 @@ class ProxyHandler(tornado.web.RequestHandler):
         else:
             upstream.connect((host, int(port)), start_tunnel)
 
+
 def get_proxy(url):
     url_parsed = urlparse(url, scheme='http')
     proxy_key = '%s_proxy' % url_parsed.scheme
     return os.environ.get(proxy_key)
 
+
 def base_auth_valid(auth_header):
-    from tornado.escape import utf8
-    from hashlib import md5
     # Basic Zm9vOmJhcg==
     auth_mode, auth_base64 = auth_header.split(' ', 1)
     assert auth_mode == 'Basic'
@@ -167,9 +239,11 @@ def base_auth_valid(auth_header):
     else:
         return False
 
+
 def parse_proxy(proxy):
     proxy_parsed = urlparse(proxy, scheme='http')
     return proxy_parsed.hostname, proxy_parsed.port
+
 
 def match_white_iplist(clientip):
     if clientip in white_iplist:
@@ -178,10 +252,14 @@ def match_white_iplist(clientip):
         return True
     return False
 
+
 def shield_attack(header):
-    if re.search(header,'ApacheBench'):
+    return False
+    print header
+    if re.search(header, 'ApacheBench'):
         return True
     return False
+
 
 def fetch_request(url, callback, **kwargs):
     proxy = get_proxy(url)
@@ -195,36 +273,39 @@ def fetch_request(url, callback, **kwargs):
 
     req = tornado.httpclient.HTTPRequest(url, **kwargs)
     client = tornado.httpclient.AsyncHTTPClient()
-    client.fetch(req, callback,follow_redirects=True,max_redirects=3)
-
+    client.fetch(req, callback, follow_redirects=True, max_redirects=3)
 
 
 def run_proxy(port, start_ioloop=True):
     app = tornado.web.Application([
+        (r'/ad_info', AdInfoHandler),
         (r'.*', ProxyHandler),
-    ])
+    ],
+        template_path=os.path.join(os.path.dirname(__file__), "templates"),
+        static_path=os.path.join(os.path.dirname(__file__), "static"))
     app.listen(port)
     ioloop = tornado.ioloop.IOLoop.instance()
     if start_ioloop:
         ioloop.start()
 
+
 if __name__ == '__main__':
     white_iplist = []
     import argparse
     parser = argparse.ArgumentParser(description='''python -m toproxy/proxy  -p 8888 -w 127.0.0.1,8.8.8.8 -u xiaorui:fengyun''')
-    
-    parser.add_argument('-p','--port', help='tonado proxy listen port', action='store',default=8888)
-    parser.add_argument('-w','--white', help='white ip list ---> 127.0.0.1,215.8.1.3', action='store',default=[])
-    parser.add_argument('-u','--user',help='Base Auth , xiaoming:123123',action='store',default=None)
+
+    parser.add_argument('-p', '--port', help='tonado proxy listen port', action='store', default=8888)
+    parser.add_argument('-w', '--white', help='white ip list ---> 127.0.0.1,215.8.1.3', action='store', default=[])
+    parser.add_argument('-u', '--user', help='Base Auth , xiaoming:123123', action='store', default=None)
     args = parser.parse_args()
     if not args.port:
         parser.print_help()
     port = int(args.port)
     white_iplist = args.white
     if args.user:
-        base_auth_user,base_auth_passwd = args.user.split(':')
+        base_auth_user, base_auth_passwd = args.user.split(':')
     else:
-        base_auth_user,base_auth_passwd = None,None
-        
+        base_auth_user, base_auth_passwd = None, None
+
     print ("Starting HTTP proxy on port %d" % port)
     run_proxy(port)
