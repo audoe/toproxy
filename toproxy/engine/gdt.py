@@ -1,7 +1,6 @@
 # coding:utf-8
 #!/usr/bin/env python
 import json
-from utils import async
 
 
 class GDTAd(object):
@@ -10,7 +9,6 @@ class GDTAd(object):
         pass
 
     @classmethod
-    @async
     def open(cls, data):
         data = json.loads(data)
         result = []

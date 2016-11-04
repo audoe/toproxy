@@ -1,8 +1,6 @@
 # coding:utf-8
 #!/usr/bin/env python
 import json
-from utils import async
-
 
 class WYAd(object):
 
@@ -10,7 +8,6 @@ class WYAd(object):
         pass
 
     @classmethod
-    @async
     def open(cls, data):
         data = json.loads(data.decode('gb2312').encode('utf8'))
         result = []

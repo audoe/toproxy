@@ -6,8 +6,6 @@ import os
 import re
 import socket
 from urlparse import urlparse
-import threading
-import functools
 import tornado.httpserver
 import tornado.ioloop
 import tornado.iostream
@@ -22,6 +20,8 @@ from engine.sohu import SohuAd
 from engine.qq import QQAd
 from models import AdInfo
 from datetime import datetime
+from datetime import date
+from utils import async
 
 logger = logging.getLogger()
 
@@ -29,18 +29,9 @@ ad_route = [
     ("http://news.l.qq.com/app", QQAd.open),
     ("http://mi.gdt.qq.com/gdt_mview.fcg", GDTAd.open),
     ("http://g1.163.com/madrs", WYAd.open),
-    ("http://lf.snssdk.com/api/news/feed/v47", JRTTAd.open),
+    ("http://lf.snssdk.com/api/news/feed/v47/", JRTTAd.open),
     ("http://s.go.sohu.com/adgtr/", SohuAd.open)
 ]
-
-
-def async(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        my_thread = threading.Thread(target=func, args=args, kwargs=kwargs)
-        my_thread.setDaemon(True)
-        my_thread.start()
-    return wrapper
 
 
 class AdInfoHandler(tornado.web.RequestHandler):
@@ -72,12 +63,13 @@ class ProxyHandler(tornado.web.RequestHandler):
     SUPPORTED_METHODS = ['GET', 'POST', 'CONNECT']
 
     @classmethod
+    @async
     def handle_ads(cls, engine, data):
         ads = []
         ads = engine(data)
         for ad in ads:
             ad_info = AdInfo()
-            if ad_info.query(u"`title`= '%s' AND `ad_type` = '%s'" % (ad['title'], ad['ad_type'])):
+            if ad_info.query(u"DATE(create_time) = '%s' AND `title`= '%s' AND `description`= '%s' AND `ad_type` = '%s'" % (date.today(), ad['title'], ad['description'], ad['ad_type'])):
                 continue
             ad_info.title = ad['title']
             ad_info.description = ad['description']
@@ -101,7 +93,7 @@ class ProxyHandler(tornado.web.RequestHandler):
                 # 广告抓取
                 for url, engine in ad_route:
                     if re.match(url, response.effective_url):
-                        async(ProxyHandler.handle_ads, engine, response.body)
+                        ProxyHandler.handle_ads(engine, response.body)
 
                 self.set_status(response.code)
                 for header in ('Date', 'Cache-Control', 'Server', 'Content-Type', 'Location'):
@@ -139,6 +131,15 @@ class ProxyHandler(tornado.web.RequestHandler):
             self.write('')
             self.finish()
             return
+
+        if not match_with_uri(self.request.uri):
+            logger.debug('deny %s', self.request.uri)
+            print "这是广告代理，不代理其他请求", self.request.uri
+            self.set_status(403)
+            self.write('')
+            self.finish()
+            return
+            
         body = self.request.body
         if not body:
             body = None
@@ -250,6 +251,23 @@ def match_white_iplist(clientip):
         return True
     if not white_iplist:
         return True
+    return False
+
+
+def match_with_uri(uri):
+    domains = {
+        "lf.snssdk.com": 1,
+        "mi.gdt.qq.com": 1,
+        "c.3g.163.com": 1,
+        "g1.163.com": 1,
+        "r.cnews.qq.com": 1,
+        "news.l.qq.com": 1,
+        "c.m.163.com": 1,
+        "zyzc9.com": 1
+    }
+    for domain in domains.keys():
+        if re.search(domain, uri):
+            return True
     return False
 
 
