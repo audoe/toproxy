@@ -39,20 +39,22 @@ class AdInfoHandler(tornado.web.RequestHandler):
 
     @tornado.web.asynchronous
     def get(self):
-        page = int(self.request.arguments.get('page', 1)) - 1
+        page = int(self.request.arguments.get('page', [1])[0])
         page_size = 50
 
         ad_type = self.request.arguments.get('ad_type', [''])[0]
         key = self.request.arguments.get('key', [''])[0]
-        query_str = "`is_game_id` != -1"
+        query_str = "`is_game_ad` != -1"
         if ad_type:
-            query_str = " AND `ad_type` = '%s'" % ad_type
+            query_str += " AND `ad_type` = '%s'" % ad_type
         if key:
             query_str += " AND (`title` like '%%%s%%' or `description` like '%%%s%%')" % (key, key)
+
+        print query_str
         ad_info = AdInfo().query(query_str)
         result_size = len(ad_info)
         pages = result_size / page_size + 1     
-        query_str += "order by create_time desc limit %s, %s" % (page*page_size, page_size)
+        query_str += " order by create_time desc limit %s, %s" % ((page-1)*page_size, page_size)
         ad_info = AdInfo().query(query_str)
         left, right = "", ""
         if page > 1:
@@ -62,18 +64,30 @@ class AdInfoHandler(tornado.web.RequestHandler):
 
         self.render("ad_info.html", ad_type=ad_type, key=key, ad_info=ad_info, current=page, pages=pages, left=left, right=right)
 
+    @tornado.web.asynchronous
+    def post(self):
+        return self.get()
+
+
 class NotGameAdReportHandler(tornado.web.RequestHandler):
     SUPPORTED_METHODS = ['GET', 'POST', 'CONNECT']
 
     @tornado.web.asynchronous
     def get(self, id='0'):
 
+        id = self.request.arguments.get('id', [''])[0]
         ad_info = AdInfo().query_one("id = '%s'" % id)
         ad_info.is_game_ad = -1
         ad_info.save()
+        self.set_status(200)
         self.write("success")
-        self.flush()
+        self.finish()
         return
+
+    @tornado.web.asynchronous
+    def post(self):
+        return self.get()
+
 
 
 class ProxyHandler(tornado.web.RequestHandler):

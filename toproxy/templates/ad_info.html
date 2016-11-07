@@ -70,13 +70,13 @@
 		{%if left%}
 			<li><a href="#" data-page="{{left}}">&laquo;</a></li>
 		{% end %}
-	{% for page in range(pages)%}
+	        {% for page in range(1, pages+1)%}
 		{%if page == current%}
 		<li class="active"><a href="#" data-page="{{page}}">{{page}}</a></li>
 		{% else %}
 		<li ><a href="#" data-page="{{page}}">{{page}}</a></li>
 		{% end %}
-	{% end %}
+	        {% end %}
 		{%if right%}
 			<li><a href="#" data-page="{{right}}">&raquo;</a></li>
 		{% end %}
@@ -88,10 +88,11 @@
 <script>
 $(document).ready(function(){
   $("a.node").click(function(){
-  	$.post('/not_game_ad_report', params={'id':$(this).attr('data-id')}, content=this, success=function(data){
-  		tr = $(this).close("tr");
+  	$.post('/not_game_ad_report', data={'id':$(this).attr('data-id')}, content=this).done(function(data){
+  		tr = $(content).closest("tr");
   		$(tr).remove();
   		});
+        return false;
   });
   $(".pagination a").click(function(){
   	page = $(this).attr("data-page");
