@@ -29,7 +29,7 @@ ad_route = [
     ("http://news.l.qq.com/app", QQAd.open),
     ("http://mi.gdt.qq.com/gdt_mview.fcg", GDTAd.open),
     ("http://g1.163.com/madrs", WYAd.open),
-    ("http://lf.snssdk.com/api/news/feed/v47/", JRTTAd.open),
+    ("http://lf.snssdk.com/api/news/feed/", JRTTAd.open),
     ("http://s.go.sohu.com/adgtr/", SohuAd.open)
 ]
 
@@ -39,6 +39,9 @@ class AdInfoHandler(tornado.web.RequestHandler):
 
     @tornado.web.asynchronous
     def get(self):
+        page = int(self.request.arguments.get('page', 1)) - 1
+        page_size = 50
+
         ad_type = self.request.arguments.get('ad_type', [''])[0]
         key = self.request.arguments.get('key', [''])[0]
         query_str = "`is_game_id` != -1"
@@ -46,11 +49,18 @@ class AdInfoHandler(tornado.web.RequestHandler):
             query_str = " AND `ad_type` = '%s'" % ad_type
         if key:
             query_str += " AND (`title` like '%%%s%%' or `description` like '%%%s%%')" % (key, key)
-        query_str += "order by create_time desc"
-
         ad_info = AdInfo().query(query_str)
+        result_size = len(ad_info)
+        pages = result_size / page_size + 1     
+        query_str += "order by create_time desc limit %s, %s" % (page*page_size, page_size)
+        ad_info = AdInfo().query(query_str)
+        left, right = "", ""
+        if page > 1:
+            left = page - 1
+        if page < pages:
+            right = page + 1
 
-        self.render("ad_info.html", ad_info=ad_info)
+        self.render("ad_info.html", ad_type=ad_type, key=key, ad_info=ad_info, current=page, pages=pages, left=left, right=right)
 
 class NotGameAdReportHandler(tornado.web.RequestHandler):
     SUPPORTED_METHODS = ['GET', 'POST', 'CONNECT']

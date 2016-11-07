@@ -8,26 +8,26 @@
 		<p style="
     float: left;
 ">广告代理设置帮助，请<a href="/static/help.html">点击</a></p>
-<form style="
+<form id="search_form" style="
     float: right;
 " class="form-inline" role="form" action="/ad_info">
   <div class="form-group">
     <div class="input-group">
       <div class="input-group-addon">来源</div>
-<select class="form-control" name="ad_type">
-          <option value="">全部</option>
-          <option value="广点通">广点通</option>
-          <option value="今日头条">今日头条</option>
-          <option value="网易新闻">网易新闻</option>
-          <option value="腾讯新闻">腾讯新闻</option>
-          <option value="搜狐新闻">搜狐新闻</option>
+<select class="form-control" name="ad_type" >
+          <option value="" {%if ad_type == "" %}selected{% end %}>全部</option>
+          <option value="广点通"  {%if ad_type == "广点通" %}selected{% end %}>广点通</option>
+          <option value="今日头条" {%if ad_type == "今日头条" %}selected{% end %}>今日头条</option>
+          <option value="网易新闻" {%if ad_type == "网易新闻" %}selected{% end %}>网易新闻</option>
+          <option value="腾讯新闻" {%if ad_type == "腾讯新闻" %}selected{% end %}>腾讯新闻</option>
+          <option value="搜狐新闻" {%if ad_type == "搜狐新闻" %}selected{% end %}>搜狐新闻</option>
         </select>
     </div>
   </div>
   <div class="form-group">
     <div class="input-group">
       <div class="input-group-addon">关键字</div>
-      <input class="form-control" type="text" name="key" placeholder="">
+      <input class="form-control" type="text" name="key" placeholder="" value="{{key}}">
     </div>
   </div>
   <button type="submit" class="btn btn-default">搜索</button>
@@ -66,6 +66,21 @@
 			</tr>
 	            {% end %}
 		</table>
+		<ul class="pagination">
+		{%if left%}
+			<li><a href="#" data-page="{{left}}">&laquo;</a></li>
+		{% end %}
+	{% for page in range(pages)%}
+		{%if page == current%}
+		<li class="active"><a href="#" data-page="{{page}}">{{page}}</a></li>
+		{% else %}
+		<li ><a href="#" data-page="{{page}}">{{page}}</a></li>
+		{% end %}
+	{% end %}
+		{%if right%}
+			<li><a href="#" data-page="{{right}}">&raquo;</a></li>
+		{% end %}
+</ul>
 	</div>
 </body>
 <script src="/static/jquery-3.1.1.min.js">
@@ -77,6 +92,11 @@ $(document).ready(function(){
   		tr = $(this).close("tr");
   		$(tr).remove();
   		});
+  });
+  $(".pagination a").click(function(){
+  	page = $(this).attr("data-page");
+  	params = $("#search_form").serialize()
+	window.location.href = "/ad_info?" + params + "&page=" + page
   });
 });
 </script>
