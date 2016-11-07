@@ -17,7 +17,9 @@ CREATE TABLE IF NOT EXISTS `ad_info` (
   `ad_type` varchar(255),
   `description` varchar(255),
   `url` varchar(255),
-  `imgs` varchar(255)
+  `imgs` varchar(255),
+  `is_game_ad` int(4)
+
 ) ENGINE=InnoDB CHARSET=utf8;
 '''
 
@@ -152,6 +154,7 @@ class AdInfo(DBmodel):
                         "ad_type",
                         "create_time",
                         "url",
+                        "is_game_ad",
                         "imgs"
                         ]
         for f_name in self._fields:

@@ -5,7 +5,9 @@
 <body>
 	<div>
 		<h1>广告查看器(Beta)</h1>
-		<p>广告代理设置帮助，请<a href="/static/html.html">点击</a></p>
+		<p style="
+    float: left;
+">广告代理设置帮助，请<a href="/static/help.html">点击</a></p>
 <form style="
     float: right;
 " class="form-inline" role="form" action="/ad_info">
@@ -42,6 +44,8 @@
 				<td>来源</td>
 				<td>URL</td>
 				<td>图片</td>
+				<td>操作</td>
+
 			</tr>
                        </thead>
 			{% for ad in ad_info %}
@@ -57,9 +61,24 @@
 " src="{{img}}" alt="">
                     {%end%}
 				</td>
+				<td><a class="node" href="#" data-id="{{ad['id']}}" title="不是游戏广告">X</a></td>
+ 
 			</tr>
 	            {% end %}
 		</table>
 	</div>
 </body>
+<script src="/static/jquery-3.1.1.min.js">
+</script>
+<script>
+$(document).ready(function(){
+  $("a.node").click(function(){
+  	$.post('/not_game_ad_report', params={'id':$(this).attr('data-id')}, content=this, success=function(data){
+  		tr = $(this).close("tr");
+  		$(tr).remove();
+  		});
+  });
+});
+</script>
+
 </html>

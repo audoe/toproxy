@@ -41,22 +41,29 @@ class AdInfoHandler(tornado.web.RequestHandler):
     def get(self):
         ad_type = self.request.arguments.get('ad_type', [''])[0]
         key = self.request.arguments.get('key', [''])[0]
-        query_str = ""
+        query_str = "`is_game_id` != -1"
         if ad_type:
-            query_str = "`ad_type` = '%s'" % ad_type
-
-        if ad_type and key:
+            query_str = " AND `ad_type` = '%s'" % ad_type
+        if key:
             query_str += " AND (`title` like '%%%s%%' or `description` like '%%%s%%')" % (key, key)
-        elif key:
-            query_str += " `title` like '%%%s%%' or `description` like '%%%s%%'" % (key, key)
-        if query_str:
-            query_str += "order by create_time desc"
-        else:
-            query_str += "1=1 order by create_time desc"
+        query_str += "order by create_time desc"
 
         ad_info = AdInfo().query(query_str)
 
         self.render("ad_info.html", ad_info=ad_info)
+
+class NotGameAdReportHandler(tornado.web.RequestHandler):
+    SUPPORTED_METHODS = ['GET', 'POST', 'CONNECT']
+
+    @tornado.web.asynchronous
+    def get(self, id='0'):
+
+        ad_info = AdInfo().query_one("id = '%s'" % id)
+        ad_info.is_game_ad = -1
+        ad_info.save()
+        self.write("success")
+        self.flush()
+        return
 
 
 class ProxyHandler(tornado.web.RequestHandler):
@@ -69,8 +76,9 @@ class ProxyHandler(tornado.web.RequestHandler):
         ads = engine(data)
         for ad in ads:
             ad_info = AdInfo()
-            if ad_info.query(u"DATE(create_time) = '%s' AND `title`= '%s' AND `description`= '%s' AND `ad_type` = '%s'" % (date.today(), ad['title'], ad['description'], ad['ad_type'])):
+            if ad_info.query(u"(DATE(create_time) = '%s' AND `title`= '%s' AND `description`= '%s' AND `ad_type` = '%s') or (`is_game_ad` =-1 AND `title`= '%s' AND `description`= '%s' AND `ad_type` = '%s') " % (date.today(), ad['title'], ad['description'], ad['ad_type'], ad['title'], ad['description'], ad['ad_type'])):
                 continue
+
             ad_info.title = ad['title']
             ad_info.description = ad['description']
             ad_info.create_time = datetime.now()
@@ -297,6 +305,7 @@ def fetch_request(url, callback, **kwargs):
 def run_proxy(port, start_ioloop=True):
     app = tornado.web.Application([
         (r'/ad_info', AdInfoHandler),
+        (r'/not_game_ad_report', NotGameAdReportHandler),
         (r'.*', ProxyHandler),
     ],
         template_path=os.path.join(os.path.dirname(__file__), "templates"),
